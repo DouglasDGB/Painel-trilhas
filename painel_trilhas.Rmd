@@ -1,0 +1,160 @@
+---
+title: "Pedido_Lucas_Brandao"
+author: "Douglas Goncalves"
+date: "2022-10-25"
+output: html_document
+---
+1
+nome do aluno
+telefone do aluno (se houver)
+e-mail do aluno (se houver)
+escolaridade do aluno
+código da turma
+data de nascimento ou idade
+Município de residência do aluno
+id_turma
+dc_etapa
+
+2
+id_turma
+dc_municipio
+nome_escola
+dc_tipo_ensino
+dc_nivel
+dc_etapa
+Eixo tecnológico do curso (se houver)
+dc_curso (se houver)
+dc_turno
+telefone escola
+e mail escola
+data de início do curso
+data de término do curso
+
+```{r BIBLIOTECA}
+if(!require(data.table)){install.packages("data.table");require(data.table)}
+if(!require(plyr)){install.packages("plyr");require(plyr)}
+if(!require(openxlsx)){install.packages("openxlsx");require(openxlsx)}
+if(!require(rstudioapi)){install.packages("rstudioapi"); require(rstudioapi)}
+if(!require(tidyverse)){install.packages("tidyverse");require(tidyverse)}
+if(!require(dplyr)){install.packages("dplyr");require(dplyr)}
+if(!require(tidyr)){install.packages("tidyr");require(tidyr)}
+if(!require(readr)){install.packages("readr");require(readr)}
+if(!require(DBI)){install.packages("DBI");require(DBI)}
+if(!require(RPostgreSQL)){install.packages("RPostgreSQL");require(RPostgreSQL)}
+if(!require(tibbletime)){install.packages("tibbletime");require(tibbletime)}
+if(!require(timetk)){install.packages("timetk");require(timetk)}
+
+paste("Bibliotecas importadas em", format(Sys.time(), "%d/%m/%Y %H:%M:%S")) #essa parte me retorna QUANDO a biblioteca foi importada
+
+```
+
+```{r DIRETORIO}
+
+diretorio <- dirname((getSourceEditorContext()$path))
+paste("Diretório principal:", diretorio)
+
+```
+
+```{r ENTRADAS}
+
+setwd(file.path(dirname(dirname(diretorio)), "entradas")) 
+
+  tb_matricula <- fread(list.files(pattern = "tb_matricula"),
+                    sep = "|",
+                    encoding = "UTF-8",
+                    na.strings = "") %>% 
+    setnames("#id_matricula", "id_matricula")
+  
+  setwd(file.path(dirname(dirname(diretorio)), "entradas")) 
+  
+   tb_enturmacao <- fread(list.files(pattern = "tb_enturmacao"),
+                    sep = "|",
+                    encoding = "UTF-8",
+                    na.strings = "") %>% 
+    setnames("#id_enturmacao", "id_enturmacao")
+   
+     setwd(file.path(dirname(dirname(diretorio)), "entradas")) 
+  
+   tb_turma <- fread(list.files(pattern = "tb_turma"),
+                    sep = "|",
+                    encoding = "UTF-8",
+                    na.strings = "") %>% 
+    setnames("#id_turma", "id_turma")
+   
+   setwd(file.path(dirname(dirname(diretorio)), "entradas")) 
+  
+   tb_cadastro <- fread(list.files(pattern = "tb_cadastro"),
+                    sep = "|",
+                    encoding = "UTF-8",
+                    na.strings = "") %>% 
+     setnames("#id_aluno", "id_aluno")
+   
+   setwd(file.path(dirname(dirname(diretorio)), "entradas")) 
+
+  tb_endereco <- fread(list.files(pattern = "tb_endereco"),
+                    sep = "|",
+                    encoding = "UTF-8",
+                    na.strings = "") %>% 
+    setnames("#id_instituicao_endereco", "id_instituicao_endereco")
+
+   
+```
+
+```{r TRANSFORMAÇÃO}
+
+relatorio_alunos <- tb_matricula %>% 
+  inner_join(tb_enturmacao %>% select(id_aluno, id_matricula, id_turma, nome_turma, id_curso, dc_curso, dt_remanejamento), by = c("id_aluno", "id_matricula")) %>% 
+  inner_join(tb_cadastro %>% select(id_aluno, dt_nascimento, email_aluno, num_telefone_aluno, dc_municipio_end), by = "id_aluno") %>% 
+  filter(id_situacao_matricula == "A", 
+         dc_tipo_ensino %in% c("INTEGRAL", "INTEGRAL PROFISSIONAL", "PROFISSIONAL"),
+         dc_nivel %in% c("ENSINO MÉDIO", "EDUCAÇÃO PROFISSIONAL"),
+         is.na(dt_remanejamento)) %>% 
+  inner_join(tb_turma %>% select(id_turma,dc_projeto, fl_ativa), by = "id_turma") %>% 
+  filter(!dc_projeto %in% c("AEE", "Aprofundamento de estudos"),
+         fl_ativa == "Sim") %>% 
+  select(nome_aluno,
+         num_telefone_aluno,
+         email_aluno,
+         dc_tipo_ensino,
+         dc_etapa,
+         dc_nivel,
+         dt_nascimento,
+         dc_municipio_end,
+         id_turma)
+
+relatorio_turmas <- tb_turma %>% 
+  inner_join(tb_endereco %>% select(id_escola, dc_municipio, num_telefone_escola, email_escola, nome_escola, id_endereco), by = c("id_escola", "id_endereco")) %>% 
+  filter(fl_ativa =="Sim",
+         dc_tipo_ensino %in% c("INTEGRAL", "INTEGRAL PROFISSIONAL", "PROFISSIONAL"),
+         dc_nivel %in% c("ENSINO MÉDIO", "EDUCAÇÃO PROFISSIONAL"),
+         !dc_projeto %in% c("AEE", "Aprofundamento de estudos")) %>% 
+  select(id_turma,
+         dc_municipio,
+         nome_escola,
+         id_escola,
+         dc_tipo_ensino,
+         dc_nivel,
+         dc_etapa,
+         dc_curso,
+         dc_turno,
+         num_telefone_escola,
+         email_escola,
+         dt_inicio_periodo_letivo,
+         dt_termino_periodo_letivo) %>% 
+  distinct()
+
+```
+
+```{r WORKBOOK}
+
+setwd(file.path(dirname((diretorio)), "saidas")) 
+
+
+openxlsx::write.xlsx(relatorio_alunos, "2022_10_25_Relatorio_alunos.xlsx")
+
+
+openxlsx::write.xlsx(relatorio_turmas, "2022_10_25_Relatorio_turmas.xlsx")
+
+
+```
+
